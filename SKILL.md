@@ -11,11 +11,10 @@ user-invocable: true
 
 ## ⚠️ 重要说明
 
-**摄像头权限问题：**
-- macOS 无法直接给 QClaw 赋予摄像头权限
-- **首次启动必须在 Terminal 中手动执行命令**
-- **QClaw 不要自己执行，要指导用户在 Terminal 中执行**
-- 手动执行才能触发 macOS 的摄像头授权窗口
+**摄像头权限：**
+- 首次使用需要在 Terminal 中手动执行，触发 macOS 摄像头授权
+- **授权成功后，QClaw 可以直接通过 Bash 执行启动命令**
+- 已授权用户可以直接语音控制
 
 **图片上传机制：**
 - 检测到人脸后，返回图片绝对路径
@@ -24,13 +23,11 @@ user-invocable: true
 
 ---
 
-## 📋 首次使用指南
+## 📋 使用指南
 
-### 第一次启动
+### 首次使用（需要授权）
 
-**关键：** 首次启动必须由用户在 Terminal 中手动执行，才能触发 macOS 的摄像头授权窗口。
-
-**步骤：**
+**如果你从未授权过 Terminal 访问摄像头：**
 
 1. **打开终端（Terminal）**
 
@@ -49,8 +46,18 @@ user-invocable: true
    ```
 
 5. **后续使用**：
-   - 授权成功后，就可以直接对 QClaw 说 "启动人脸监控" 了
-   - QClaw 会自动检查状态并控制监控
+   - 授权成功后，直接对 QClaw 说 "启动人脸监控" 即可
+   - QClaw 会自动执行启动命令
+
+### 已授权用户
+
+**如果你已经授权过 Terminal 访问摄像头：**
+
+直接对 QClaw 说：
+- **"启动人脸监控"** - QClaw 自动启动监控
+- **"有没有检测到人脸？"** - 获取最新照片
+- **"查看监控状态"** - 查看当前状态
+- **"停止人脸监控"** - 停止监控
 
 ---
 
@@ -73,48 +80,65 @@ user-invocable: true
 
 **用户说：** "启动人脸监控"
 
-**QClaw 行为：**
-
-**情况 A：首次启动（监控未运行）**
-
-**⚠️ 关键：QClaw 不要自己执行命令，要指导用户在 Terminal 中手动执行！**
+**QClaw 执行：**
 
 **Step 1**: 检查监控是否已在运行
-
-```bash
-ps aux | grep "main.py.*start" | grep -v grep
-```
-
-**Step 2**: 如果未运行，告诉用户在 Terminal 中手动执行
-
-**QClaw 回复：**
-
-```
-⚠️ 首次启动需要授权摄像头权限
-
-请在 **终端（Terminal）** 中运行以下命令：
-
-cd ~/.qclaw/skills/FishGuard && python3 main.py --action start --daemon
-
-首次运行时，macOS 会弹出授权窗口，请点击「允许」授权摄像头访问。
-
-授权成功后，监控会在后台运行，之后就可以直接用语音控制了。
-```
-
-**情况 B：监控已在运行**
-
-**QClaw 执行：** 检查进程状态
 
 ```bash
 cd ~/.qclaw/skills/FishGuard
 python3 main.py --action status
 ```
 
-**QClaw 回复：**
+**Step 2**: 根据状态返回结果
+
+**情况 A：监控已在运行**
 
 ```
 ✅ 人脸监控已在运行中
 警报次数: 3
+```
+
+**情况 B：监控未运行（已授权用户）**
+
+**QClaw 直接执行启动命令：**
+
+```bash
+cd ~/.qclaw/skills/FishGuard
+python3 main.py --action start --daemon
+```
+
+**返回结果：**
+
+```json
+{
+  "status": "success",
+  "message": "✅ 人脸监控已启动，正在后台运行",
+  "pid": 12345
+}
+```
+
+**QClaw 回复：**
+
+```
+✅ 人脸监控已启动，正在后台运行
+人脸面积阈值: 15000
+监控中...
+```
+
+**情况 C：启动失败（需要授权）**
+
+如果返回失败或提示需要摄像头权限：
+
+```
+⚠️ 启动失败，需要摄像头权限
+
+请在 **终端（Terminal）** 中运行以下命令授权：
+
+cd ~/.qclaw/skills/FishGuard && python3 main.py --action start --daemon
+
+首次运行时会弹出授权窗口，请点击「允许」授权摄像头。
+
+授权成功后，以后就可以直接说 "启动人脸监控" 了。
 ```
 
 ---
@@ -336,27 +360,21 @@ pip3 install -r requirements.txt
 
 ## 示例对话
 
-### 示例 1：首次启动
+### 示例 1：启动监控（已授权用户）
 
 ```
 用户: 启动人脸监控
-QClaw: ⚠️ 首次启动需要授权摄像头权限
-       
-       请在 **终端（Terminal）** 中运行以下命令：
-       
-       cd ~/.qclaw/skills/FishGuard && python3 main.py --action start --daemon
-       
-       首次运行时，macOS 会弹出授权窗口，请点击「允许」授权摄像头访问。
-       
-       授权成功后，监控会在后台运行，之后就可以直接用语音控制了。
+QClaw: 正在启动人脸监控...
+       ✅ 人脸监控已启动，正在后台运行
+       人脸面积阈值: 15000
+       监控中...
 ```
 
-### 示例 2：授权后启动
+### 示例 2：监控已在运行
 
 ```
 用户: 启动人脸监控
-QClaw: 正在检查监控状态...
-       ✅ 人脸监控已在运行中
+QClaw: ✅ 人脸监控已在运行中
        警报次数: 3
 ```
 
@@ -389,6 +407,21 @@ QClaw: 📊 人脸监控状态
 QClaw: ✅ 人脸监控已停止
 ```
 
+### 示例 6：首次使用（需要授权）
+
+```
+用户: 启动人脸监控
+QClaw: ⚠️ 启动失败，需要摄像头权限
+       
+       请在 **终端（Terminal）** 中运行以下命令授权：
+       
+       cd ~/.qclaw/skills/FishGuard && python3 main.py --action start --daemon
+       
+       首次运行时会弹出授权窗口，请点击「允许」授权摄像头。
+       
+       授权成功后，以后就可以直接说 "启动人脸监控" 了。
+```
+
 ---
 
 ## 注意事项
@@ -402,29 +435,30 @@ QClaw: ✅ 人脸监控已停止
 
 ## 快速开始
 
-### 首次使用（必须手动执行）
+### 1. 安装依赖
 
-1. **安装依赖**：
-   ```bash
-   cd ~/.qclaw/skills/FishGuard
-   pip3 install -r requirements.txt
-   ```
+```bash
+cd ~/.qclaw/skills/FishGuard
+pip3 install -r requirements.txt
+```
 
-2. **首次启动（在 Terminal 中执行）**：
-   ```bash
-   cd ~/.qclaw/skills/FishGuard && python3 main.py --action start --daemon
-   ```
-   点击「允许」授权摄像头访问
+### 2. 授权摄像头（仅首次）
 
-3. **确认成功**：看到 "✅ 人脸监控已启动"
+如果你从未授权过 Terminal 访问摄像头：
 
-### 后续使用（语音控制）
+```bash
+cd ~/.qclaw/skills/FishGuard && python3 main.py --action start --daemon
+```
 
-授权成功后，可以直接对 QClaw 说：
+点击「允许」授权摄像头访问。
 
-- **"启动人脸监控"** - 启动监控（如未运行）
+### 3. 语音控制
+
+授权后，直接对 QClaw 说：
+
+- **"启动人脸监控"** - 启动监控
 - **"有没有检测到人脸？"** - 获取最新照片
-- **"查看监控状态"** - 查看当前状态
+- **"查看监控状态"** - 查看状态
 - **"停止人脸监控"** - 停止监控
 
 ---
