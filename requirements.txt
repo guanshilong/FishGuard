@@ -1,0 +1,10 @@
+# Face Alert Skill 依赖
+
+# OpenCV - 人脸检测和图像处理
+opencv-python>=4.8.0
+
+# Requests - HTTP 请求（发送到 QClaw）
+requests>=2.31.0
+
+# NumPy - 数值计算
+numpy>=1.24.0
