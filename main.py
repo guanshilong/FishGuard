@@ -15,6 +15,9 @@ import os
 import sys
 import time
 import json
+import signal
+import subprocess
+import glob
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 import threading
@@ -409,12 +412,14 @@ class FaceAlertSkill:
         return result
     
     def monitor_loop(self):
-        """监控循环（在独立线程中运行）"""
+        """监控循环（在主线程中运行，macOS AVFoundation 要求）"""
+        # macOS: 必须在主线程中打开摄像头，否则 AVFoundation 无法初始化
         if not self.detector.start():
             print("❌ 无法启动摄像头")
+            self.is_monitoring = False
             return
         
-        print("✅ 人脸监控已启动")
+        print("✅ 人脸监控已启动，摄像头已打开")
         
         while self.is_monitoring:
             # 检测人脸并获取当前帧
@@ -435,6 +440,9 @@ class FaceAlertSkill:
         """
         启动监控
         
+        注意：在 macOS 上，AVFoundation 要求摄像头在主线程中初始化。
+        因此 monitor_loop 应该在主线程中调用，整个脚本作为后台进程运行。
+        
         Returns:
             启动结果（符合 QClaw 标准）
         """
@@ -447,8 +455,10 @@ class FaceAlertSkill:
             }
         
         self.is_monitoring = True
-        self.monitor_thread = threading.Thread(target=self.monitor_loop, daemon=True)
-        self.monitor_thread.start()
+        
+        # 直接在当前线程（主线程）运行监控循环
+        # 整个脚本应该作为后台进程启动，而不是在子线程中运行
+        self.monitor_loop()
         
         return {
             "status": "success",
@@ -654,6 +664,175 @@ def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
 # ============== 独立运行模式 ==============
 
 if __name__ == "__main__":
+    import argparse
+    import subprocess
+    import glob
+    
+    parser = argparse.ArgumentParser(description="Face Alert Skill - 人脸监控警报系统")
+    parser.add_argument(
+        "--action",
+        choices=["start", "stop", "status", "check_alert", "get_latest_photo"],
+        default="start",
+        help="操作类型: start(启动) | stop(停止) | status(状态) | check_alert(检查警报) | get_latest_photo(获取最新照片)"
+    )
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=15000,
+        help="人脸面积阈值（默认 15000）"
+    )
+    parser.add_argument(
+        "--daemon",
+        action="store_true",
+        help="以守护进程模式运行（后台运行）"
+    )
+    
+    args = parser.parse_args()
+    
+    # 获取脚本目录
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    PID_FILE = os.path.join(SCRIPT_DIR, ".face-alert.pid")
+    
+    # 特殊处理：获取最新照片（供 QClaw 调用）
+    if args.action == "get_latest_photo":
+        screenshots_dir = os.path.join(SCRIPT_DIR, "screenshots")
+        photos = glob.glob(os.path.join(screenshots_dir, "alert_*.png"))
+        
+        if not photos:
+            print(json.dumps({
+                "status": "no_photo",
+                "message": "暂无照片"
+            }, ensure_ascii=False))
+        else:
+            # 按修改时间排序，获取最新的
+            latest_photo = max(photos, key=os.path.getmtime)
+            photo_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getmtime(latest_photo)))
+            
+            print(json.dumps({
+                "status": "success",
+                "message": f"最新照片: {photo_time}",
+                "image_path": latest_photo,
+                "photo_time": photo_time
+            }, ensure_ascii=False))
+        sys.exit(0)
+    
+    # 特殊处理：启动守护进程
+    if args.action == "start" and args.daemon:
+        # 检查是否已在运行
+        if os.path.exists(PID_FILE):
+            try:
+                with open(PID_FILE, "r") as f:
+                    pid = int(f.read().strip())
+                os.kill(pid, 0)
+                print(json.dumps({
+                    "status": "already_running",
+                    "message": "人脸监控已在运行中",
+                    "pid": pid
+                }, ensure_ascii=False))
+                sys.exit(0)
+            except (ValueError, ProcessLookupError):
+                os.remove(PID_FILE)
+        
+        # 启动 daemon.py
+        daemon_path = os.path.join(SCRIPT_DIR, "daemon.py")
+        subprocess.Popen(
+            [sys.executable, daemon_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+        
+        # 等待启动
+        time.sleep(2)
+        
+        # 检查是否启动成功
+        if os.path.exists(PID_FILE):
+            with open(PID_FILE, "r") as f:
+                pid = int(f.read().strip())
+            print(json.dumps({
+                "status": "success",
+                "message": "✅ 人脸监控已启动，正在后台运行",
+                "pid": pid,
+                "threshold": args.threshold
+            }, ensure_ascii=False))
+        else:
+            print(json.dumps({
+                "status": "failed",
+                "message": "❌ 启动失败，请检查摄像头权限"
+            }, ensure_ascii=False))
+        sys.exit(0)
+    
+    # 特殊处理：停止守护进程
+    if args.action == "stop":
+        if not os.path.exists(PID_FILE):
+            print(json.dumps({
+                "status": "not_running",
+                "message": "人脸监控未在运行"
+            }, ensure_ascii=False))
+            sys.exit(0)
+        
+        try:
+            with open(PID_FILE, "r") as f:
+                pid = int(f.read().strip())
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(1)
+            
+            print(json.dumps({
+                "status": "success",
+                "message": "✅ 人脸监控已停止"
+            }, ensure_ascii=False))
+        except ProcessLookupError:
+            os.remove(PID_FILE)
+            print(json.dumps({
+                "status": "not_running",
+                "message": "人脸监控未在运行"
+            }, ensure_ascii=False))
+        sys.exit(0)
+    
+    # 特殊处理：查看状态
+    if args.action == "status":
+        STATUS_FILE = os.path.join(SCRIPT_DIR, ".face-alert-status.json")
+        
+        if not os.path.exists(PID_FILE):
+            print(json.dumps({
+                "status": "success",
+                "message": "人脸监控状态: 已停止",
+                "is_monitoring": False
+            }, ensure_ascii=False))
+        else:
+            try:
+                with open(PID_FILE, "r") as f:
+                    pid = int(f.read().strip())
+                os.kill(pid, 0)
+                
+                # 读取状态文件
+                if os.path.exists(STATUS_FILE):
+                    with open(STATUS_FILE, "r") as f:
+                        status = json.load(f)
+                    print(json.dumps({
+                        "status": "success",
+                        "message": "人脸监控状态: 运行中",
+                        "is_monitoring": True,
+                        "alert_count": status.get("alert_count", 0),
+                        "pid": pid
+                    }, ensure_ascii=False))
+                else:
+                    print(json.dumps({
+                        "status": "success",
+                        "message": "人脸监控状态: 运行中",
+                        "is_monitoring": True,
+                        "pid": pid
+                    }, ensure_ascii=False))
+            except ProcessLookupError:
+                os.remove(PID_FILE)
+                print(json.dumps({
+                    "status": "success",
+                    "message": "人脸监控状态: 已停止",
+                    "is_monitoring": False
+                }, ensure_ascii=False))
+        sys.exit(0)
+    
+    # 默认行为：交互式运行（前台运行）
     print("=" * 60)
     print("Face Alert Skill - 人脸监控警报系统")
     print("=" * 60)
@@ -661,7 +840,7 @@ if __name__ == "__main__":
     
     # 创建 Skill 实例
     skill = FaceAlertSkill({
-        "min_face_area": 15000,
+        "min_face_area": args.threshold,
         "screenshot_dir": "./screenshots",
         "qclaw_api": "http://localhost:8080/api/send_message",
         "wechat_receiver": "qclaw_butler"
