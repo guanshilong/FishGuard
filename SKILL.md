@@ -3,13 +3,48 @@ id: face-alert
 name: Face Alert Skill
 version: 1.0.0
 author: FishGuard Team
-platform: qclaw, openclaw
+platforms:
+  - qclaw
+  - openclaw
 description: 人脸监控警报系统 - 检测到人脸靠近时捕获摄像头照片并发送通知
+triggers:
+  - "/face-alert"
+  - "启动人脸监控"
+  - "人脸监控"
+  - "启动监控"
+keywords:
+  - 人脸检测
+  - 监控
+  - 摄像头
+  - 人脸警报
+  - face detection
 tags:
   - face-detection
   - camera-capture
   - security-alert
   - monitoring
+commands:
+  - name: start
+    description: 启动人脸监控
+    triggers:
+      - "启动人脸监控"
+      - "启动监控"
+  - name: stop
+    description: 停止人脸监控
+    triggers:
+      - "停止人脸监控"
+      - "停止监控"
+  - name: status
+    description: 查看监控状态
+    triggers:
+      - "查看监控状态"
+      - "监控状态"
+  - name: check_alert
+    description: 检查是否有新警报
+    triggers:
+      - "检查警报"
+      - "有没有检测到人脸"
+      - "人脸警报"
 ---
 
 # Face Alert Skill
@@ -24,6 +59,67 @@ tags:
 - ✅ **命令控制** - 支持启动、停止、状态查询
 - ✅ **防抖机制** - 避免频繁触发（默认 5 秒）
 - ✅ **可配置阈值** - 调整人脸面积触发阈值
+
+## 使用示例
+
+### 示例 1：启动监控
+
+**用户输入：**
+```
+启动人脸监控
+```
+
+**Skill 返回：**
+```
+✅ 人脸监控已启动，正在后台运行
+人脸面积阈值: 15000
+监控中...
+```
+
+### 示例 2：检测到人脸
+
+**用户输入：**
+```
+有没有检测到人脸？
+```
+
+**Skill 返回：**
+```
+🚨 人脸监控警报
+时间: 2026-04-17 10:30:00
+人脸数量: 1
+最大面积: 18500
+
+图片已保存，QClaw 正在上传到云端...
+```
+
+### 示例 3：查看状态
+
+**用户输入：**
+```
+查看监控状态
+```
+
+**Skill 返回：**
+```
+📊 人脸监控状态
+状态: 运行中
+警报次数: 3
+阈值: 15000
+```
+
+### 示例 4：停止监控
+
+**用户输入：**
+```
+停止人脸监控
+```
+
+**Skill 返回：**
+```
+✅ 人脸监控已停止
+累计警报次数: 3
+```
 
 ## 使用方式
 

@@ -1,3 +1,4 @@
 screenshots
 screenshots/*
 test_screenshots
+__pycache__

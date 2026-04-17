@@ -10,26 +10,32 @@
 
 实时人脸监控警报系统，检测到人脸靠近时自动捕获摄像头照片，并将图片路径返回给 QClaw，由 QClaw 上传云端并返回链接给用户。
 
-## 功能特性
-
-- ✅ 实时人脸监控检测
-- ✅ 自动捕获摄像头照片
-- ✅ 返回图片路径给 QClaw
-- ✅ QClaw 自动上传云端并返回链接
-- ✅ 支持命令启动/停止
-- ✅ 防抖机制（默认 5 秒）
-
 ## 快速开始
 
-### 安装依赖
+### 安装 Skill
 
-```bash
-pip install -r requirements.txt
+1. **将项目添加到 QClaw Skills 目录：**
+   ```bash
+   # 复制项目到 QClaw Skills 目录
+   cp -r /Users/guanshilong/app/ai/python/FishGuard ~/.qclaw/skills/face-alert
+   ```
+
+2. **安装 Python 依赖：**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### 使用方式
+
+在 QClaw 对话界面中，使用以下触发词：
+
+#### 方式 1：使用触发词
+
+```
+/face-alert
 ```
 
-### QClaw 使用
-
-在 QClaw 对话界面中发送指令：
+#### 方式 2：自然语言
 
 **启动监控：**
 ```
@@ -51,66 +57,99 @@ pip install -r requirements.txt
 停止人脸监控
 ```
 
-### 命令行测试
+## 功能特性
 
-```bash
-# 测试功能
-python3 cli.py test
-
-# 启动监控
-python3 cli.py start --threshold 15000
-
-# 查看状态
-python3 cli.py status
-
-# 停止监控
-python3 cli.py stop
-```
+- ✅ 实时人脸监控检测
+- ✅ 自动捕获摄像头照片
+- ✅ 返回图片路径给 QClaw
+- ✅ QClaw 自动上传云端并返回链接
+- ✅ 支持命令启动/停止
+- ✅ 防抖机制（默认 5 秒）
 
 ## 使用示例
 
-### 检测到人脸时的返回
-
-```json
-{
-  "status": "success",
-  "message": "🚨 人脸监控警报\n时间: 2026-04-17 10:30:00\n人脸数量: 1",
-  "image_path": "/Users/xxx/FishGuard/screenshots/alert_20260417_103000.png",
-  "alert_count": 1,
-  "is_monitoring": true
-}
-```
-
-**QClaw 会自动：**
-1. 接收 `image_path`
-2. 上传图片到云端
-3. 返回云端链接给用户
-
-## 工作流程
+### 示例 1：启动监控
 
 ```
-用户："启动监控" 
-  ↓
-QClaw 调用 Skill
-  ↓
-Skill 开始后台监控
-  ↓
-检测到人脸 → 拍照 → 保存
-  ↓
-QClaw 轮询检查
-  ↓
-Skill 返回图片路径
-  ↓
-QClaw 上传云端 → 返回链接
+用户: 启动人脸监控
+QClaw: ✅ 人脸监控已启动，正在后台运行
+       人脸面积阈值: 15000
+       监控中...
 ```
 
-## 配置参数
+### 示例 2：检测到人脸
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `threshold` | 15000 | 人脸面积阈值（越大越难触发） |
-| `wechat_receiver` | qclaw_butler | 微信接收者 ID |
-| `debounce_time` | 5.0 | 防抖时间（秒） |
+```
+用户: 有没有检测到人脸？
+QClaw: 🚨 人脸监控警报
+       时间: 2026-04-17 10:30:00
+       人脸数量: 1
+       最大面积: 18500
+       
+       图片已上传: https://cloud.example.com/image.png
+```
+
+### 示例 3：查看状态
+
+```
+用户: 查看监控状态
+QClaw: 📊 人脸监控状态
+       状态: 运行中
+       警报次数: 3
+       阈值: 15000
+```
+
+## 触发词列表
+
+| 触发词 | 说明 |
+|--------|------|
+| `/face-alert` | 主触发词 |
+| `启动人脸监控` | 启动监控 |
+| `启动监控` | 启动监控（简写） |
+| `停止人脸监控` | 停止监控 |
+| `停止监控` | 停止监控（简写） |
+| `查看监控状态` | 查看状态 |
+| `监控状态` | 查看状态（简写） |
+| `有没有检测到人脸？` | 检查警报 |
+| `检查警报` | 检查警报 |
+| `人脸警报` | 检查警报 |
+
+## 常见问题
+
+<details>
+<summary>Q: 为什么 QClaw 没有识别到这个 Skill？</summary>
+
+A: 请检查：
+1. Skill 是否正确安装到 `~/.qclaw/skills/` 目录
+2. 文件夹名称是否正确（建议使用 `face-alert`）
+3. 是否包含 `SKILL.md` 文件
+4. 是否安装了 Python 依赖
+</details>
+
+<details>
+<summary>Q: 如何测试 Skill 是否正常工作？</summary>
+
+A: 使用命令行工具测试：
+```bash
+python3 cli.py test
+python3 cli.py start
+python3 cli.py status
+```
+</details>
+
+<details>
+<summary>Q: 图片如何上传到云端？</summary>
+
+A: Skill 只返回图片的本地路径，QClaw 接收到路径后会自动上传到云端并返回链接。
+</details>
+
+<details>
+<summary>Q: 摄像头无法启动？</summary>
+
+A: 
+- **macOS**: 系统偏好设置 → 安全性与隐私 → 摄像头 → 允许终端/Python
+- **Linux**: 检查设备 `ls /dev/video*`
+</details>
 
 ## 项目结构
 
@@ -129,34 +168,6 @@ FishGuard/
 - **OpenCV** - 人脸检测
 - **Python** - 后端逻辑
 - **QClaw** - 云端上传和用户交互
-
-## 常见问题
-
-<details>
-<summary>Q: QClaw 如何知道检测到了人脸？</summary>
-
-A: QClaw 会定期调用 `check_alert` action 来检查是否有新的警报。建议轮询间隔 5-10 秒。
-</details>
-
-<details>
-<summary>Q: 图片如何上传到云端？</summary>
-
-A: Skill 只返回图片的本地路径，QClaw 接收到路径后会自动上传到云端并返回链接。
-</details>
-
-<details>
-<summary>Q: 如何调整触发灵敏度？</summary>
-
-A: 通过 `threshold` 参数调整。数值越大，需要人脸越近才会触发。
-</details>
-
-<details>
-<summary>Q: 摄像头无法启动？</summary>
-
-A: 
-- **macOS**: 系统偏好设置 → 安全性与隐私 → 摄像头 → 允许终端/Python
-- **Linux**: 检查设备 `ls /dev/video*`
-</details>
 
 ## 开发者
 
